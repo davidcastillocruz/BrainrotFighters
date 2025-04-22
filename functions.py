@@ -1,0 +1,140 @@
+"""Shared helpers: resolution-relative layout, persisted settings (data.json) and image utilities."""
+
+import json
+import pygame
+
+
+# Layout helpers: convert percentages of the current resolution into pixels,
+# so every scene scales with the configured window size.
+
+def position(x, y):
+    resolution = get_resolution()
+    return ((resolution[0] * x) // 100, (resolution[1] * y) // 100)
+
+def size(w, h):
+    resolution = get_resolution()
+    return ((resolution[0] * w) // 100, (resolution[1] * h) // 100)
+
+def position_x(x):
+    resolution = get_resolution()
+    return resolution[0] * x // 100
+
+def position_y(y):
+    resolution = get_resolution()
+    return resolution[1] * y // 100
+
+def size_x(w):
+    resolution = get_resolution()
+    return resolution[0] * w // 100
+
+def size_y(h):
+    resolution = get_resolution()
+    return resolution[1] * h // 100
+
+
+# Settings stored under the "Config" key of data.json.
+
+def get_songs_volume():
+    with open("data.json", "r") as file:
+        data = json.load(file)
+        return data["Config"]["SongsVolume"]
+
+def get_sounds_volume():
+    with open("data.json", "r") as file:
+        data = json.load(file)
+        return data["Config"]["SoundsVolume"]
+
+def set_songs_volume(volume):
+    with open("data.json", "r") as file:
+        data = json.load(file)
+    data["Config"]["SongsVolume"] = volume
+    with open("data.json", "w") as file:
+        json.dump(data, file, indent=4)
+
+def set_sounds_volume(volume):
+    with open("data.json", "r") as file:
+        data = json.load(file)
+    data["Config"]["SoundsVolume"] = volume
+    with open("data.json", "w") as file:
+        json.dump(data, file, indent=4)
+
+def get_resolution():
+    with open("data.json", "r") as file:
+        data = json.load(file)
+        return data["Config"]["Resolution"]
+
+def set_resolution(resolution:list):
+    with open("data.json", "r") as file:
+        data = json.load(file)
+        data["Config"]["Resolution"] = resolution
+    with open("data.json", "w") as file:
+        json.dump(data, file, indent=4)
+
+def get_fps():
+    with open("data.json") as file:
+        data = json.load(file)
+        return data["Config"]["Fps"]
+
+def set_fps(fps):
+    with open("data.json", "r") as file:
+        data = json.load(file)
+    data["Config"]["Fps"] = fps
+    with open("data.json", "w") as file:
+        json.dump(data, file, indent=4)
+
+def get_fullscreen():
+    with open("data.json", "r") as file:
+        data = json.load(file)
+        return data["Config"]["Fullscreen"]
+
+def set_fullscreen(value):
+    with open("data.json", "r") as file:
+        data = json.load(file)
+    data["Config"]["Fullscreen"] = value
+    with open("data.json", "w") as file:
+        json.dump(data, file, indent=4)
+
+def get_showfps():
+    with open("data.json", "r") as file:
+        data = json.load(file)
+        return data["Config"]["Showfps"]
+
+def set_showfps(value):
+    with open("data.json", "r") as file:
+        data = json.load(file)
+    data["Config"]["Showfps"] = value
+    with open("data.json", "w") as file:
+        json.dump(data, file, indent=4)
+
+
+# Image helpers
+
+def load_sprites(path_pattern: str, count: int, size: tuple):
+    """Load and scale a numbered sprite sequence, e.g. "walk_{}.png" -> walk_1.png ... walk_N.png."""
+    return tuple(pygame.transform.scale(pygame.image.load(path_pattern.format(i + 1)), size)
+                 for i in range(count))
+
+def render_text_with_border(text, font, text_color, border_color):
+    """Render text with a 1px outline by blitting it offset in four directions."""
+    text_surface = font.render(text, True, border_color)
+
+    border_surface = pygame.Surface((text_surface.get_width() + 2, text_surface.get_height() + 2), pygame.SRCALPHA)
+
+    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        border_surface.blit(font.render(text, True, border_color), (dx + 1, dy + 1))
+
+    border_surface.blit(font.render(text, True, text_color), (1, 1))
+
+    return border_surface
+
+def grayscale_image(surface):
+    """Return a grayscale copy of a surface, preserving alpha."""
+    gray_surface = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+
+    for x in range(surface.get_width()):
+        for y in range(surface.get_height()):
+            r, g, b, a = surface.get_at((x, y))
+            gray = int((r + g + b) / 3)
+            gray_surface.set_at((x, y), (gray, gray, gray, a))
+
+    return gray_surface
