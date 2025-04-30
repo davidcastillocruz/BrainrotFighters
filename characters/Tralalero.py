@@ -1,0 +1,136 @@
+import pygame
+from characters.Character import Character
+from characters.Projectile import Proyectile
+from functions import load_sprites, size, position_x, position_y
+from random import randint
+
+class Tralalero(Character):
+    """
+    Basic: melee bite.
+    Elemental: 2-4 homing bubbles.
+    Ultimate: a wave that crosses the screen and slows the enemy on hit.
+    """
+
+    def __init__(self, fight, controls, pos):
+        self.sprite_size = size(20, 25)
+
+        self.profile_image = pygame.transform.scale(pygame.image.load("assets/images/fight/tralalero_tralala/marco_tralalalero.png").convert_alpha(), size(7, 12))
+
+        self.basic_skill_img = pygame.transform.scale(pygame.image.load("assets/images/fight/tralalero_tralala/tralalero_basic_skill_image.png"), size(7, 10))
+        self.elemental_skill_img = pygame.transform.scale(pygame.image.load("assets/images/fight/tralalero_tralala/tralalero_elemental_skill_image.png"), size(7, 10))
+        self.ultimate_skill_img = pygame.transform.scale(pygame.image.load("assets/images/fight/tralalero_tralala/tralalero_ultimate_skill_image.png"), size(7, 10))
+
+        self.left_animation_sprites = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_left_{}.png", 3, self.sprite_size)
+        self.right_animation_sprites = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_right_{}.png", 3, self.sprite_size)
+
+        self.idle_left_animation_sprites = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_idle_left_{}.png", 2, self.sprite_size)
+        self.idle_right_animation_sprites = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_idle_right_{}.png", 2, self.sprite_size)
+
+        self.basic_skill_left_animation = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_basic_skill_left_{}.png", 4, self.sprite_size
+        )
+        self.basic_skill_right_animation = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_basic_skill_right_{}.png", 4, self.sprite_size
+        )
+
+        self.elemental_skill_left_animation = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_elemental_skill_left_{}.png", 5, self.sprite_size
+        )
+        self.elemental_skill_right_animation = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_elemental_skill_right_{}.png", 5, self.sprite_size
+        )
+
+        # The ultimate reuses the elemental animation.
+        self.ultimate_skill_left_animation = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_elemental_skill_left_{}.png", 5, self.sprite_size
+        )
+        self.ultimate_skill_right_animation = load_sprites(
+            "assets/images/fight/tralalero_tralala/tralalero_elemental_skill_right_{}.png", 5, self.sprite_size
+        )
+
+        self.current_walk_sprite = 0
+        self.current_idle_sprite = 0
+        self.current_basic_skill_sprite = 0
+        self.current_elemental_skill_sprite = 0
+        self.current_ultimate_skill_sprite = 0
+
+        self.size = size(10, 15)  # hitbox
+        super().__init__(fight, controls, pos)
+
+        self.fight.game.sound_manager.load_sound("TralaleroBite", "assets/sounds/tralalero_bite.mp3")
+        self.fight.game.sound_manager.load_sound("TralaleroBubbles", "assets/sounds/tralalero_bubbles.mp3")
+        self.fight.game.sound_manager.load_sound("TralaleroWave", "assets/sounds/tralalero_wave.mp3")
+
+        self.bubbles = []
+        self.elemental_skill_damage = 5
+
+        self.wave = None
+        self.ultimate_skill_damage = 20
+
+        # Make every skill available from the start of the fight.
+        current_time = pygame.time.get_ticks()
+        self.basic_skill_last_time = current_time - self.basic_skill_cooldown
+        self.elemental_skill_last_time = current_time - self.elemental_skill_cooldown
+        self.ultimate_skill_last_time = current_time - self.ultimate_skill_cooldown
+
+        self.current_sprite = self.left_animation_sprites[self.current_walk_sprite]
+
+    def manage_events(self, dt):
+        super().manage_events(dt)
+
+        for bubble in self.bubbles:
+            if bubble.status:
+                bubble.move(dt)
+
+        self.bubbles = [b for b in self.bubbles if b.status]
+
+        if self.wave:
+            if self.wave.status:
+                self.wave.move(dt)
+            else:
+                self.wave = None
+
+    def basic_skill(self):
+        if self.rect.colliderect(self.enemy.rect):
+            self.enemy.deal_damage(self.basic_skill_damage)
+        self.fight.game.sound_manager.play_sound("TralaleroBite")
+
+    def elemental_skill(self):
+        # Spawn the bubbles at random points around Tralalero.
+        for i in range(randint(2, 4)):
+            bubble = Proyectile(
+                (randint(self.rect.center[0] - position_x(5), self.rect.center[0] + position_x(5)),
+                 randint(self.rect.center[1] - position_y(5), self.rect.center[1] + position_y(5))),
+                size(3, 5), size(3, 4), 300, 4, self.enemy, damage=self.elemental_skill_damage,
+                animation_path="assets/images/fight/tralalero_tralala/bubble_{}.png", animation_cooldown=200, sprites_count=1
+            )
+            self.bubbles.append(bubble)
+        self.fight.game.sound_manager.play_sound("TralaleroBubbles")
+
+    def ultimate_skill(self):
+        objective = (self.rect.center[0] - position_x(55), self.rect.center[1]) if self.last_direction == "left" else (self.rect.center[0] + position_x(55), self.rect.center[1])
+
+        self.wave = Proyectile(
+            self.rect.topleft, size(20, 25), size(16, 23), 300, 10, self.enemy,
+            damage=self.ultimate_skill_damage, debuff=("x_velocity", 400, 3), objective=objective,
+            animation_path="assets/images/fight/tralalero_tralala/"+self.last_direction+"_wave_{}.png",
+            animation_cooldown=500, sprites_count=3
+        )
+        self.fight.game.sound_manager.play_sound("TralaleroWave")
+
+    def draw(self, screen):
+        img_rect = self.current_sprite.get_rect()
+        img_rect.center = self.rect.center
+        screen.blit(self.current_sprite, img_rect)
+
+        for bubble in self.bubbles:
+            if bubble.status:
+                bubble.draw(screen)
+
+        if self.wave:
+            if self.wave.status:
+                self.wave.draw(screen)
